@@ -3,3 +3,7 @@ homework-instruction
 **/*.exe
 **/*.output
 todo.md
+projects/**/tests
+projects/**/tests-out
+projects/**/test*.sh
+projects/tester
