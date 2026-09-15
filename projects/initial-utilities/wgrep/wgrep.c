@@ -1,8 +1,3 @@
-/*
-Usage: wgrep <keyword> [files...]
-- For each file, print out the lines with user-specified search term.
-*/
-
 #define _POSIX_C_SOURCE 200809L // enable POSIX.1-2008 features
 #include <stdio.h>
 #include <stdlib.h>

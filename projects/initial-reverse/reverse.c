@@ -1,12 +1,3 @@
-/*
-reverse: Output lines in input in reverse order.
-
-Usage: (default input/output is standard input/output)
-./reverse
-./reverse input.txt
-./reverse input.txt output.txt
-*/
-
 #define _POSIX_C_SOURCE 200809L // enable POSIX.1-2008 features
 #include <stdio.h>
 #include <stdlib.h>

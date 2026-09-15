@@ -1,8 +1,3 @@
-/*
-Usage: wcat [files...]
-- print out each file in turn.
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 

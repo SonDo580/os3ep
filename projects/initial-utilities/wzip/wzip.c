@@ -1,10 +1,3 @@
-/*
-Usage: wzip [files...]
-- Apply run-length encoding:
-  . n same-type characters in a row = number n + 1 character instance
-  . Example: "aaa" -> "3a"
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 

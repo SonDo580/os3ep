@@ -1,8 +1,3 @@
-/*
-Usage: wunzip [files...]
-- Decode output of 'wzip'.
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
