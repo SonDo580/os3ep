@@ -1,5 +1,5 @@
-#ifndef __table_h__
-#define __table_h__
+#ifndef __hashtable_h__
+#define __hashtable_h__
 
 #include <stddef.h>
 #include <stdint.h>
@@ -19,7 +19,7 @@ typedef struct __HTable
     size_t num_entries;
 } HTable;
 
-typedef void (*ForEachCallback)(HNode *);
+typedef void (*ForEachCallback)(HNode *, void *);
 
 HTable *table_create();
 void table_upsert(HTable *table, int key, char *value);
@@ -27,6 +27,6 @@ HNode **table_lookup(HTable *table, int key);
 bool table_detach(HTable *table, int key);
 void table_clear(HTable *table);
 void table_dealloc(HTable *table);
-void table_foreach(HTable *table, ForEachCallback callback);
+void table_foreach(HTable *table, ForEachCallback callback, void *args);
 
 #endif

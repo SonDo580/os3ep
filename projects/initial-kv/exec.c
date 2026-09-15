@@ -31,7 +31,7 @@ static void exec_put(char **tokens, HTable *table)
     int key;
     if (!parse_int(tokens[1], &key))
     {
-        fprintf(stderr, "invalid key\n");
+        fprintf(stderr, "invalid key %s\n", tokens[1]);
         return;
     }
 
@@ -39,9 +39,9 @@ static void exec_put(char **tokens, HTable *table)
     table_upsert(table, key, value);
 }
 
-static void print_entry(HNode *node)
+void write_entry(HNode *node, FILE *fp)
 {
-    printf("%d,%s\n", node->key, node->value);
+  fprintf(fp, "%d,%s\n", node->key, node->value);
 }
 
 static void exec_get(char **tokens, HTable *table)
@@ -49,7 +49,7 @@ static void exec_get(char **tokens, HTable *table)
     int key;
     if (!parse_int(tokens[1], &key))
     {
-        fprintf(stderr, "invalid key\n");
+        fprintf(stderr, "invalid key %s\n", tokens[1]);
         return;
     }
 
@@ -57,7 +57,7 @@ static void exec_get(char **tokens, HTable *table)
     if (from == NULL)
         printf("%d not found\n", key);
     else
-        print_entry(*from);
+        write_entry(*from, stdout);
 }
 
 static void exec_delete(char **tokens, HTable *table)
@@ -65,7 +65,7 @@ static void exec_delete(char **tokens, HTable *table)
     int key;
     if (!parse_int(tokens[1], &key))
     {
-        fprintf(stderr, "invalid key\n");
+        fprintf(stderr, "invalid key %s\n", tokens[1]);
         return;
     }
 
@@ -81,7 +81,7 @@ static void exec_clear(HTable *table)
 
 static void exec_all(HTable *table)
 {
-    table_foreach(table, print_entry);
+    table_foreach(table, (ForEachCallback)write_entry, stdout);
 }
 
 void exec_cmd(char **tokens, int count, HTable *table)

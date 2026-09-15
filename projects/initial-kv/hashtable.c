@@ -123,14 +123,14 @@ void table_dealloc(HTable *table)
 }
 
 /* invoke callback function for each node. */
-void table_foreach(HTable *table, ForEachCallback callback)
+void table_foreach(HTable *table, ForEachCallback callback, void* args)
 {
     for (int i = 0; i < table->num_buckets; i++)
     {
         HNode *curr = table->buckets[i];
         while (curr != NULL)
         {
-            callback(curr);
+            callback(curr, args);
             curr = curr->next;
         }
     }
