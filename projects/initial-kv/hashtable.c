@@ -10,26 +10,35 @@ A simple hash table implementation:
 
 #include <assert.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "hashtable.h"
+#include "common.h"
 
-void table_init(HTable *table, size_t num_buckets)
+HTable *table_create()
 {
-    // Ensure num_buckets is power of 2
-    assert(num_buckets > 0 && (num_buckets & (num_buckets - 1)) == 0);
+    HTable *table = Malloc(sizeof(HTable));
+    table->num_buckets = 1 << 10;
+    table->buckets = (HNode **)Calloc(table->num_buckets, sizeof(HNode *));
+    table->num_entries = 0;
+    return table;
+}
 
-    table->buckets = (HNode **)calloc(num_buckets, sizeof(HNode *));
-    table->num_buckets = num_buckets;
+static inline unsigned my_abs(int x)
+{
+    if (x == INT_MIN)
+        return (unsigned)INT_MAX + 1U;
+    return (x < 0) ? -x : x;
 }
 
 /* decide bucket based on hash code. */
-static inline size_t table_index(HTable *table, int64_t key)
+static inline size_t table_index(HTable *table, int key)
 {
-    return abs(key) & (table->num_buckets - 1);
+    return my_abs(key) & (table->num_buckets - 1);
 }
 
 /* update entry value or insert at front of chain. */
-void table_upsert(HTable *table, int64_t key, char *value)
+void table_upsert(HTable *table, int key, char *value)
 {
     HNode **from = table_lookup(table, key); // incoming pointer to target
 
@@ -37,10 +46,11 @@ void table_upsert(HTable *table, int64_t key, char *value)
     {
         // Insert at front of chain
         size_t index = table_index(table, key);
-        HNode *new_node = (HNode *)malloc(sizeof(HNode));
+        HNode *new_node = (HNode *)Malloc(sizeof(HNode));
         new_node->next = table->buckets[index];
         new_node->value = value;
         new_node->key = key;
+        table->buckets[index] = new_node;
         return;
     }
 
@@ -50,13 +60,8 @@ void table_upsert(HTable *table, int64_t key, char *value)
     target->value = value;
 }
 
-static inline uint64_t abs(int64_t x)
-{
-    return (x < 0) ? -x : x;
-}
-
 /* return incoming pointer to target HNode*; return NULL if not found. */
-HNode **table_lookup(HTable *table, int64_t key)
+HNode **table_lookup(HTable *table, int key)
 {
     assert(table->buckets != NULL);
     size_t index = table_index(table, key);
@@ -79,18 +84,18 @@ static void node_dealloc(HNode *node)
     free(node);
 }
 
-/* detach a node; return 1 on success, 0 if not found. */
-int table_detach(HTable *table, int64_t key)
+/* detach a node; return true on success, false if not found. */
+bool table_detach(HTable *table, int key)
 {
     HNode **from = table_lookup(table, key); // incoming pointer to target
     if (from == NULL)
-        return 0;
+        return false;
 
     // Detach target
     HNode *target = *from;
     *from = target->next;
     node_dealloc(target);
-    return 1;
+    return true;
 }
 
 /* deallocate all entries. */
