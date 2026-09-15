@@ -39,5 +39,7 @@ int main(int argc, char *argv[])
 
 Useful for:
 - waiting for specific child
-- polling (with option WNOHANG)
+- polling (with option WNOHANG): check if the child has finished without blocking
+  . returns child PID if terminated.
+  . returns 0 immediately if child is still running.
 */
