@@ -14,7 +14,7 @@ void *mythread(void *arg)
 {
     printf("%s: begin\n", (char *)arg);
     for (int i = 0; i < 1e7; i++)
-        counter = counter + 1; // TODO: can we use counter++
+        counter = counter + 1;
     printf("%s: done\n", (char *)arg);
     return NULL;
 }
