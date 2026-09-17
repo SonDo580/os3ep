@@ -30,35 +30,41 @@ static void builtin_path(ArgArray *args, PathArray *paths)
         push_path(paths, args->args[i]);
 }
 
-/* This function should not return. If it does, there was an error. */
+/* This function won't return. Either exec() was successful or an error occurred.*/
 static void execute_program(ArgArray *args, PathArray *paths, char *out)
 {
     // Find executable
     char *executable_path = NULL;
+
+    char filepath[1024]; // a "reasonable" buffer
+    
+    // "Exact" approaches:
+    // 1) . declare `char *filepath` outside of 'for' loop.
+    //    . `filepath = realloc(filepath, size)` in each iteration.
+    //    . set `executable_path = filepath` on success.
+    // 2) . allocate `char filepath[size]` in each iteration.
+    //    . set `executable_path = strdup(filepath)` on success.
+    // - We must remember to free 'executable_path' in all failed cases.
+    //   -> Just use a fixed buffer for simplicity.
+
     for (int i = 0; i < paths->count; i++)
     {
+        // filepath = "{dirpath}/{filename}"
         char *dirpath = paths->paths[i];
         char *filename = args->args[0];
         assert(dirpath != NULL && filename != NULL);
+        snprintf(filepath, sizeof(filepath), "%s/%s", dirpath, filename);
 
-        // filepath = "{dirpath}/{filename}"
-        char filepath[strlen(dirpath) + 1 + strlen(filename) + 1];
-        int i = 0;
-        while (*dirpath != '\0')
-            filepath[i++] = *dirpath;
-        filepath[i++] = '/';
-        while (*filename != '\0')
-            filepath[i++] = *dirpath;
-        filepath[i] = '\0';
-
+        // Check file existence and executable permission
         if (access(filepath, X_OK) == 0)
         {
             executable_path = filepath;
             break;
         }
     }
+
     if (executable_path == NULL)
-        return;
+        panic();
 
     // Replace arg 0 and mark end of args
     replace_arg(args, 0, executable_path);
@@ -69,22 +75,24 @@ static void execute_program(ArgArray *args, PathArray *paths, char *out)
     {
         int out_fd = open(out, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
         if (out_fd == -1)
-            return;
+            panic();
 
         if (dup2(out_fd, STDOUT_FILENO) == -1)
-            return;
+            panic();
         if (dup2(out_fd, STDERR_FILENO) == -1)
-            return;
+            panic();
         // dup2(fd, fd2) closes fd2 then makes fd2 open on the same file as fd.
         // -> stdout and stderr now shares the same file table entry and file offset.
 
         // Close original fd (file table entry is already referenced by stdout and stderr).
         if (close(out_fd) == -1)
-            return;
+            panic();
     }
 
-    // (this only returns if there was an error)
     execv(args->args[0], args->args);
+
+    // If exec() returns, an error occurred
+    exit(EXIT_FAILURE);
 }
 
 /* Execute parallel commands or single command.
@@ -121,10 +129,6 @@ void execute_commands(CommandArray *commands, PathArray *paths)
             else if (rc == 0)
             { // child process goes down this path
                 execute_program(args, paths, command->out);
-
-                // If execute_program() returns, there was an error.
-                print_err();
-                exit(EXIT_FAILURE);
             }
             else
             { // parent process goes down this path

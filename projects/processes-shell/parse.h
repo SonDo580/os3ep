@@ -5,6 +5,6 @@
 
 #include "command.h"
 
-bool parse_commands(char **line, CommandArray *commands);
+bool parse_commands(char *line, CommandArray *commands);
 
 #endif

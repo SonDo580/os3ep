@@ -6,7 +6,7 @@ A command line interpreter _(i.e. a shell)_.
 
 ```bash
 # Build
-make
+make wish
 
 # Interactive mode: show prompt, user types in the commands
 ./wish
@@ -52,4 +52,52 @@ path /bin /usr/bin
 ## Syntax notes
 
 - Allow variable amount of whitespaces (' ', '\t') before and after commands, arguments, operators.
-- Operators ('>', '&) do not require whitespaces.
+- Operators ('>', '&') do not require whitespaces.
+- **Don't allow** empty component before/after '>'.
+- **Don't allow** empty component in parallel commands _(leading/trailing/consecutive '&')_.
+
+## Debugging tips (`GDB`)
+
+```bash
+# Keep both parent and child processes suspended and attached
+set detach-on-fork off
+
+# (Optional) Switch focus to child process after the fork
+set follow-fork-mode child
+
+# List running processes
+info inferiors
+
+# Switch between parent and child
+inferior <num>
+```
+
+## My modification to supplied `tests`
+
+- **3**:
+  - Don't set `path` -> Search in `/bin`.
+  - The error shows absolute path, not just program name.
+
+```bash
+# === 3.pre ===
+# before
+ls: cannot access '/no/such/file': No such file or directory
+# after
+/bin/ls: cannot access '/no/such/file': No such file or directory
+```
+
+- **16**, **17**:
+  - The tests accept leading/trailing/consecutive '&'.
+  - I treat those cases as errors (standard shell behavior).
+
+```bash
+# === 16.err, 17.err ===
+# before: (empty)
+# after
+An error has occurred
+
+# === 17.out ===
+# before: ...
+# after: (empty)
+
+```

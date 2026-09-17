@@ -20,21 +20,24 @@ Return true on success, false on failure.
 ]
 ```
 */
-bool parse_commands(char **line, CommandArray *commands)
+bool parse_commands(char *line, CommandArray *commands)
 {
+    char *input = line;
     char *command_str;
     bool encountered_only_spaces_command = false;
+    bool encountered_empty_command = false;
 
-    while ((command_str = strsep(line, ampersand_op)) != NULL)
+    while ((command_str = strsep(&input, ampersand_op)) != NULL)
     {
         if (encountered_only_spaces_command)
-        { // parallel commands must not have any only-spaces (<-> empty) command
-            return false;
-        }
+            return false; // parallel commands must not have any only-spaces (<-> empty) command
+        if (encountered_empty_command)
+            return false; // parallel commands must not have any empty command
 
         if (*command_str == '\0')
-        { // leading/trailing "&" or consecutive "&&"
-            return false;
+        { // allow skipping single empty command, fail if detect next command
+            encountered_empty_command = true;
+            continue;
         }
 
         Command command;
@@ -45,24 +48,22 @@ bool parse_commands(char **line, CommandArray *commands)
         char *args_str = strsep(&command_str, redirect_op);
         assert(args_str != NULL); // since command_str != ""
         if (*args_str == '\0')
-        { // leading ">"
-            return false;
-        }
+            return false; // leading ">"
 
         char *arg;
-        while ((arg = strtok(args_str, spaces)) != NULL)
+        while ((arg = strsep(&args_str, spaces)) != NULL)
+        {
+            if (*arg == '\0')
+                continue; // skip empty tokens
             push_arg(&command.args, arg);
+        }
 
         if (command.args.count == 0)
         { // args_str contains only whitespaces
             if (command_str != NULL)
-            { // args_str is followed by ">" (doesn't match full command_str)
-                return false;
-            }
+                return false; // args_str is followed by ">" (doesn't match full command_str)
             else if (commands->count > 0)
-            { // parallel commands must not have any only-spaces (<-> empty) command
-                return false;
-            }
+                return false; // parallel commands must not have any only-spaces (<-> empty) command
             else
             { // allow skipping single only-spaces (<-> empty) comand, fail if detect next command
                 encountered_only_spaces_command = true;
@@ -76,25 +77,23 @@ bool parse_commands(char **line, CommandArray *commands)
         if (out_str != NULL)
         {
             if (*out_str == '\0')
-            { // trailing ">"
-                return false;
+                return false; // trailing ">"
+
+            char *out;
+            while ((out = strsep(&out_str, spaces)) != NULL)
+            {
+                if (*out == '\0')
+                    continue; // skip empty tokens
+                if (command.out != NULL)
+                    return false; // multiple redirection destinations
+                command.out = out;
             }
 
-            command.out = strtok(out_str, spaces);
             if (command.out == NULL)
-            { // out_str contains only whitespaces
-                return false;
-            }
-
-            if (strtok(out_str, spaces) != NULL)
-            { // multiple redirection destinations
-                return false;
-            }
+                return false; // out_str contains only whitespaces
 
             if (strsep(&command_str, redirect_op) != NULL)
-            { // multiple redirection operators
-                return false;
-            }
+                return false; // multiple redirection operators
         }
 
         push_command(commands, command);

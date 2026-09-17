@@ -8,7 +8,7 @@
 #include "parse.h"
 #include "exec.h"
 
-void handle(FILE *fp)
+void handle(FILE *fp, const char *prompt)
 {
     CommandArray commands;
     init_command_array(&commands);
@@ -20,9 +20,12 @@ void handle(FILE *fp)
     char *line = NULL;
     size_t linelen = 0;
 
+    if (prompt != NULL)
+        printf("%s", prompt);
+
     while (getline(&line, &linelen, fp) != -1)
     {
-        if (!parse_commands(&line, &commands))
+        if (!parse_commands(line, &commands))
         {
             print_err();
             reset_command_array(&commands);
@@ -34,6 +37,9 @@ void handle(FILE *fp)
 
         execute_commands(&commands, &paths);
         reset_command_array(&commands);
+
+        if (prompt != NULL)
+            printf("%s", prompt);
     }
 
     if (ferror(fp))
@@ -45,14 +51,14 @@ void handle(FILE *fp)
 
 void interactive_mode()
 {
-    handle(stdin);
+    handle(stdin, "wish> ");
     exit(EXIT_SUCCESS);
 }
 
 void batch_mode(char *filename)
 {
     FILE *fp = Fopen(filename, "r");
-    handle(fp);
+    handle(fp, NULL);
     fclose(fp);
     exit(EXIT_SUCCESS);
 }
