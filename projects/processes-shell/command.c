@@ -1,3 +1,6 @@
+#include <assert.h>
+#include <stdlib.h>
+
 #include "common.h"
 #include "command.h"
 
@@ -8,12 +11,6 @@ void init_command_array(CommandArray *commands)
     commands->count = 0;
 }
 
-void init_command(Command *command)
-{
-    command->out = NULL;
-    init_arg_array(&command->args);
-}
-
 static void init_arg_array(ArgArray *args)
 {
     args->args = NULL;
@@ -21,11 +18,17 @@ static void init_arg_array(ArgArray *args)
     args->count = 0;
 }
 
+void init_command(Command *command)
+{
+    command->out = NULL;
+    init_arg_array(&command->args);
+}
+
 void reset_command_array(CommandArray *commands)
 {
     // Free dynamically-allocated memory
-    // - tokens ('args' items, 'out') point directly to input line -> don't free
-    // - 'commands', "command" are local variables on stack -> don't free
+    // - 'out', individual args point directly to input line -> don't free
+    // - 'commands' itself, individual commands are local variables on stack -> don't free
     for (int i = 0; i < commands->count; i++)
     {
         ArgArray *args = &commands->commands[i].args;
@@ -57,4 +60,10 @@ void push_arg(ArgArray *args, char *arg)
     }
     args->args[args->count] = arg;
     args->count++;
+}
+
+void replace_arg(ArgArray *args, int index, char *arg)
+{
+    assert(index >= 0 && index < args->count);
+    args->args[index] = arg;
 }

@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdio.h>
 
-#include "command.h"
+#include "common.h"
 
 const char *err_msg = "An error has occurred\n";
 

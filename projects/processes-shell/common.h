@@ -2,6 +2,7 @@
 #define __common_h__
 
 #include <stddef.h>
+#include <stdio.h>
 
 #define ALLOCATE(type, count) \
     (type *)Realloc(NULL, sizeof(type) * (count))
