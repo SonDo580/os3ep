@@ -11,3 +11,6 @@ clean:
 
 2.concurrent-counter.exe: 2.concurrent-counter.c common_threads.h
 	$(CC) -o $@ $< $(FLAGS)
+
+3.approximate-counter.exe: 3.approximate-counter.c common_threads.h
+	$(CC) -o $@ $< $(FLAGS)
