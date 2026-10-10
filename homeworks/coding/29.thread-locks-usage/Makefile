@@ -8,3 +8,6 @@ clean:
 
 1.test.exe: 1.test.c
 	$(CC) -o $@ $< $(FLAGS)
+
+2.concurrent-counter.exe: 2.concurrent-counter.c common_threads.h
+	$(CC) -o $@ $< $(FLAGS)
