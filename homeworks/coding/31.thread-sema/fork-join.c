@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <unistd.h>
+
+#include "common_threads.h"
+
+sem_t s;
+
+void *child(void *arg)
+{
+    printf("child\n");
+    sleep(1);
+    Sem_post(&s);
+    return NULL;
+}
+
+int main()
+{
+    pthread_t p;
+    printf("parent: begin\n");
+    Sem_init(&s, 0, 0);
+    Pthread_create(&p, NULL, child, NULL);
+    Sem_wait(&s);
+    printf("parent: end\n");
+    return 0;
+}
