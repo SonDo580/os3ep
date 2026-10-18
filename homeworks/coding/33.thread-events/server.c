@@ -5,7 +5,17 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include <errno.h>
 #include <time.h>
+
+volatile sig_atomic_t server_running = 1;
+
+void sigint_handler(int sig)
+{
+    server_running = 0;
+    printf("\nShutting down...\n");
+}
 
 // Pool of connected descriptors
 typedef struct
@@ -21,9 +31,12 @@ typedef struct
 void init_pool(int listenfd, pool *p);
 void add_client(int connfd, struct sockaddr_in client_addr, pool *p);
 void service_clients(pool *p);
+int has_active_clients(pool *p);
 
 int main()
 {
+    signal(SIGINT, sigint_handler);
+
     int listenfd = socket(AF_INET, SOCK_STREAM, 0); // IPv4 + TCP
     if (listenfd < 0)
     {
@@ -63,18 +76,29 @@ int main()
     printf("Server listening on port %d\n", port);
 
     // event loop
-    while (1)
+    while (server_running || has_active_clients(&pool))
     {
+        // if shutting down, ensure listenfd is no longer watched
+        if (!server_running && listenfd != -1)
+        {
+            close(listenfd);
+            FD_CLR(listenfd, &pool.read_set);
+            listenfd = -1; // closed
+        }
+
         pool.ready_set = pool.read_set;
         pool.nready = select(pool.maxfd + 1, &pool.ready_set, NULL, NULL, NULL);
         if (pool.nready < 0)
         {
+            if (errno == EINTR)
+                continue;
+
             perror("select()");
             break;
         }
 
-        // if listenfd is ready, accept new client
-        if (FD_ISSET(listenfd, &pool.ready_set))
+        // if not shutting down and listenfd is ready, accept new client
+        if (server_running && FD_ISSET(listenfd, &pool.ready_set))
         {
             struct sockaddr_in client_addr = {};
             socklen_t addrlen = sizeof(client_addr);
@@ -193,4 +217,14 @@ void service_clients(pool *p)
             remove_client(i, p);
         }
     }
+}
+
+int has_active_clients(pool *p)
+{
+    for (int i = 0; i <= p->maxi; i++)
+    {
+        if (p->clientfd[i] != -1)
+            return 1;
+    }
+    return 0;
 }
