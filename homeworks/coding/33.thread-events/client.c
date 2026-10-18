@@ -34,8 +34,15 @@ void handle_response(int clientfd)
         perror("read()");
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    if (argc != 2)
+    {
+        fprintf(stderr, "usage: ./client.exe <filename>");
+        exit(1);
+    }
+    char *filename = argv[1];
+
     int clientfd = socket(AF_INET, SOCK_STREAM, 0); // IPv4 + TCP
     if (clientfd < 0)
     {
@@ -60,7 +67,7 @@ int main()
     int delay = rand() % 3 + 1; // 1 to 3 seconds
     sleep(delay);
 
-    send_request(clientfd, "any");
+    send_request(clientfd, filename);
 
     handle_response(clientfd);
 

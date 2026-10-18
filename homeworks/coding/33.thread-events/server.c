@@ -176,16 +176,35 @@ void remove_client(int i, pool *p)
     }
 }
 
-void handle_request(int connfd)
+void handle_request(int connfd, char *filename)
 {
-    // Just return current time for now
-    time_t rawtime;
-    time(&rawtime);
-    char *time_str = ctime(&rawtime);
+    printf("Requested file: %s\n", filename);
 
-    ssize_t n = write(connfd, time_str, strlen(time_str));
-    if (n < 0)
-        perror("write()");
+    FILE *file = fopen(filename, "r");
+    if (!file)
+    {
+        char *error_msg = "Error: File not found or cannot be opened\n";
+        write(connfd, error_msg, strlen(error_msg));
+        return;
+    }
+
+    // Read the file in chunks in stream it to client
+    char file_buffer[1024];
+    ssize_t nread;
+    while ((nread = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0)
+    {
+        ssize_t nwritten = write(connfd, file_buffer, nread);
+        if (nwritten < 0)
+        {
+            perror("write()");
+            break;
+        }
+    }
+
+    if (ferror(file))
+        perror("fread()");
+
+    fclose(file);
 }
 
 /* Service ready client connections. */
@@ -205,14 +224,17 @@ void service_clients(pool *p)
         if ((connfd > 0) && FD_ISSET(connfd, &p->ready_set))
         {
             p->nready--; // event handled
-            n = read(connfd, buffer, sizeof(buffer));
+            n = read(connfd, buffer, sizeof(buffer) - 1);
 
             if (n < 0)
                 perror("read()");
             else if (n == 0) // EOF
                 printf("Client with fd %d disconnected\n", connfd);
             else
-                handle_request(connfd);
+            {
+                buffer[n] = '\0'; // filename
+                handle_request(connfd, buffer);
+            }
 
             remove_client(i, p);
         }

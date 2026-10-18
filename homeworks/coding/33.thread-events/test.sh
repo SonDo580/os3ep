@@ -12,11 +12,14 @@ SERVER_PID=$!
 
 sleep 1
 
-echo "=== Launching first 7 clients ==="
-for i in {1..7}
+echo "=== Launching first 6 clients ==="
+for i in {1..6}
 do
-    ./client.exe &
+    ./client.exe client.c &
 done
+
+echo "=== Try requesting non-existing file ==="
+./client.exe notfound.c &
 
 sleep 1
 
@@ -28,7 +31,7 @@ sleep 1
 echo "=== Attempt launching remaining 3 clients ==="
 for i in {8..10}
 do
-    ./client.exe &
+    ./client.exe server.c &
 done
 
 wait
