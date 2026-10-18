@@ -1,8 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+
+void send_request(int clientfd, const char *request)
+{
+    printf("Sending request: %s\n", request);
+
+    ssize_t n = write(clientfd, request, strlen(request));
+    if (n < 0)
+    {
+        perror("write()");
+        exit(1);
+    }
+}
 
 void handle_response(int clientfd)
 {
@@ -18,9 +31,7 @@ void handle_response(int clientfd)
 
     // n == 0 means EOF (server closed connection)
     if (n < 0)
-    {
         perror("read()");
-    }
 }
 
 int main()
@@ -44,7 +55,8 @@ int main()
         exit(1);
     }
 
-    // Request is not needed yet. Server will only return current time.
+    send_request(clientfd, "any");
+
     handle_response(clientfd);
 
     close(clientfd);
