@@ -15,7 +15,7 @@ sleep 1
 echo "=== Launching first 6 clients ==="
 for i in {1..6}
 do
-    ./client.exe client.c &
+    ./client.exe server.c &
 done
 
 echo "=== Try requesting non-existing file ==="
@@ -31,7 +31,7 @@ sleep 1
 echo "=== Attempt launching remaining 3 clients ==="
 for i in {8..10}
 do
-    ./client.exe server.c &
+    ./client.exe client.c &
 done
 
 wait

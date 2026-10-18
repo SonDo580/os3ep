@@ -62,11 +62,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // Random delay before sending request
-    srand(getpid());
-    int delay = rand() % 3 + 1; // 1 to 3 seconds
-    sleep(delay);
-
     send_request(clientfd, filename);
 
     handle_response(clientfd);

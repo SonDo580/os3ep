@@ -20,12 +20,17 @@ void sigint_handler(int sig)
 // Pool of connected descriptors
 typedef struct
 {
-    int maxfd;        // largest descriptor in read_set
-    fd_set read_set;  // set of active descriptors (including listenfd)
-    fd_set ready_set; // subset of descriptors ready for reading
-    int nready;       // number of ready descriptors
-    int maxi;         // high watermark index into clientfd array
+    int maxfd;              // largest descriptor in read_set/write_set
+    fd_set read_set;        // set of descriptors watched for reading (including listenfd)
+    fd_set write_set;       // set of descriptors watched for writing (including listenfd)
+    fd_set ready_read_set;  // subset of descriptors ready for reading
+    fd_set ready_write_set; // subset of descriptors ready for writing
+    int nready;             // number of ready descriptors from select()
+    int maxi;               // high watermark index into clientfd array
     int clientfd[FD_SETSIZE];
+
+    // TODO: This solution is too specific. What if there are other types of requests?
+    FILE *client_file[FD_SETSIZE]; // (single) open file per client
 } pool;
 
 void init_pool(int listenfd, pool *p);
@@ -86,8 +91,15 @@ int main()
             listenfd = -1; // closed
         }
 
-        pool.ready_set = pool.read_set;
-        pool.nready = select(pool.maxfd + 1, &pool.ready_set, NULL, NULL, NULL);
+        pool.ready_read_set = pool.read_set;
+        pool.ready_write_set = pool.write_set;
+        pool.nready = select(
+            pool.maxfd + 1,
+            &pool.ready_read_set,
+            &pool.ready_write_set,
+            NULL,
+            NULL);
+
         if (pool.nready < 0)
         {
             if (errno == EINTR)
@@ -98,7 +110,7 @@ int main()
         }
 
         // if not shutting down and listenfd is ready, accept new client
-        if (server_running && FD_ISSET(listenfd, &pool.ready_set))
+        if (server_running && FD_ISSET(listenfd, &pool.ready_read_set))
         {
             struct sockaddr_in client_addr = {};
             socklen_t addrlen = sizeof(client_addr);
@@ -121,11 +133,16 @@ void init_pool(int listenfd, pool *p)
 {
     p->maxi = -1;
     for (int i = 0; i < FD_SETSIZE; i++)
+    {
         p->clientfd[i] = -1;
+        p->client_file[i] = NULL;
+    }
 
-    // Register listenfd
-    p->maxfd = listenfd;
     FD_ZERO(&p->read_set);
+    FD_ZERO(&p->write_set);
+
+    // Register listenfd for read monitoring
+    p->maxfd = listenfd;
     FD_SET(listenfd, &p->read_set);
 }
 
@@ -170,13 +187,22 @@ void remove_client(int i, pool *p)
     int connfd = p->clientfd[i];
     if (connfd > 0)
     {
+        if (p->client_file[i] != NULL)
+        {
+            fclose(p->client_file[i]);
+            p->client_file[i] = NULL;
+        }
+
         close(connfd);
+
         FD_CLR(connfd, &p->read_set);
+        FD_CLR(connfd, &p->write_set);
+
         p->clientfd[i] = -1;
     }
 }
 
-void handle_request(int connfd, char *filename)
+void handle_request(int connfd, char *filename, pool *p, int i)
 {
     printf("Requested file: %s\n", filename);
 
@@ -185,26 +211,13 @@ void handle_request(int connfd, char *filename)
     {
         char *error_msg = "Error: File not found or cannot be opened\n";
         write(connfd, error_msg, strlen(error_msg));
+        remove_client(i, p);
         return;
     }
 
-    // Read the file in chunks in stream it to client
-    char file_buffer[1024];
-    ssize_t nread;
-    while ((nread = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0)
-    {
-        ssize_t nwritten = write(connfd, file_buffer, nread);
-        if (nwritten < 0)
-        {
-            perror("write()");
-            break;
-        }
-    }
-
-    if (ferror(file))
-        perror("fread()");
-
-    fclose(file);
+    // Save state: store file pointer and register connfd for write monitoring
+    p->client_file[i] = file;
+    FD_SET(connfd, &p->write_set);
 }
 
 /* Service ready client connections. */
@@ -220,23 +233,59 @@ void service_clients(pool *p)
     for (i = 0; i <= p->maxi; i++)
     {
         connfd = p->clientfd[i];
+        if (connfd < 0)
+            continue;
 
-        if ((connfd > 0) && FD_ISSET(connfd, &p->ready_set))
+        // Handle read readiness (incoming request)
+        if (FD_ISSET(connfd, &p->ready_read_set))
         {
             p->nready--; // event handled
             n = read(connfd, buffer, sizeof(buffer) - 1);
 
             if (n < 0)
+            {
                 perror("read()");
+                remove_client(i, p);
+            }
             else if (n == 0) // EOF
+            {
                 printf("Client with fd %d disconnected\n", connfd);
+                remove_client(i, p);
+            }
             else
             {
                 buffer[n] = '\0'; // filename
-                handle_request(connfd, buffer);
+                handle_request(connfd, buffer, p, i);
+            }
+        }
+
+        // Handle write readiness
+        if (FD_ISSET(connfd, &p->ready_write_set))
+        {
+            p->nready--; // event handled
+            FILE *file = p->client_file[i];
+            if (!file)
+                continue;
+
+            // Read 1 chunk from the file and stream it to client
+            size_t nread = fread(buffer, 1, sizeof(buffer), file);
+            if (nread > 0)
+            {
+                ssize_t nwritten = write(connfd, buffer, nread);
+                if (nwritten < 0 && errno != EWOULDBLOCK && errno != EAGAIN)
+                { // if socket buffer is full, try again
+                    perror("write()");
+                    remove_client(i, p);
+                    continue;
+                }
             }
 
-            remove_client(i, p);
+            if (nread < sizeof(buffer)) // error or EOF
+            {
+                if (ferror(file))
+                    perror("fread()");
+                remove_client(i, p);
+            }
         }
     }
 }
