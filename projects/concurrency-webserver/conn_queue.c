@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "conn_queue.h"
 #include "common.h"
 
