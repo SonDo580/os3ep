@@ -19,9 +19,14 @@
 // When we test your server, we will be using modifications to this client.
 //
 
+#include <unistd.h>
+#include <assert.h>
+
 #include "io_helper.h"
+#include "common_threads.h"
 
 #define MAXBUF (8192)
+#define MAX_THREADS 100
 
 //
 // Send an HTTP request for the specified file
@@ -70,29 +75,70 @@ void client_print(int fd)
     }
 }
 
+typedef struct __Arg
+{
+    char *filename;
+    char *host;
+    int port;
+} Arg;
+
+void *worker(void *__arg)
+{
+    Arg *arg = (Arg *)__arg;
+
+    int clientfd = open_client_fd_or_die(arg->host, arg->port);
+
+    client_send(clientfd, arg->filename);
+    client_print(clientfd);
+
+    close_or_die(clientfd);
+}
+
+char *usage_msg = "usage: wclient <host> <port> <filename> [-t <threads>]\n";
+
 int main(int argc, char *argv[])
 {
     char *host, *filename;
     int port;
+    int num_threads = 1;
     int clientfd;
 
-    if (argc != 4)
+    int opt;
+    while ((opt = getopt(argc, argv, "t:")) != -1)
     {
-        fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
-        exit(1);
+        switch (opt)
+        {
+        case 't':
+            num_threads = atoi(optarg);
+            assert(num_threads > 0 && num_threads <= MAX_THREADS);
+            break;
+        default:
+            fprintf(stderr, usage_msg);
+            exit(1);
+        }
     }
 
-    host = argv[1];
-    port = atoi(argv[2]);
-    filename = argv[3];
+    if (argc - optind != 3)
+    {
+        fprintf(stderr, usage_msg);
+        exit(1);
+    }
+    host = argv[optind];
+    port = atoi(argv[optind + 1]);
+    filename = argv[optind + 2];
 
-    /* Open a single connection to the specified host and port */
-    clientfd = open_client_fd_or_die(host, port);
+    Arg arg = {
+        .host = host,
+        .port = port,
+        .filename = filename,
+    };
 
-    client_send(clientfd, filename);
-    client_print(clientfd);
+    pthread_t pid[num_threads];
+    for (int i = 0; i < num_threads; i++)
+        Pthread_create(&pid[i], NULL, worker, (void *)&arg);
 
-    close_or_die(clientfd);
+    for (int i = 0; i < num_threads; i++)
+        Pthread_join(pid[i], NULL);
 
     exit(0);
 }

@@ -16,7 +16,7 @@ ssize_t readline(int fd, void *buf, size_t maxlen)
         }
         else if (rc == 0)
         {
-            if (n == 1)
+            if (n == 0)
                 return 0; /* EOF, no data read */
             else
                 break; /* EOF, some data was read */
