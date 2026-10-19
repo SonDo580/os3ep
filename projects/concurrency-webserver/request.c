@@ -2,7 +2,7 @@
 #include "request.h"
 
 //
-// Some of this code stolen from Bryant/O'Halloran
+// Some of this code stolen from Bryant/O'Hallaron
 // Hopefully this is not a problem ... :)
 //
 
@@ -179,6 +179,10 @@ void request_handle(int fd)
     request_read_headers(fd);
 
     is_static = request_parse_uri(uri, filename, cgiargs);
+    if (strstr(filename, "../")) {
+        request_error(fd, filename, "403", "Forbidden", "'..' path is not allowed");
+        return;
+    }
     if (stat(filename, &sbuf) < 0)
     {
         request_error(fd, filename, "404", "Not found", "server could not find this file");
