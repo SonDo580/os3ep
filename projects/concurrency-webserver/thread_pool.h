@@ -3,6 +3,7 @@
 
 #include "common_threads.h"
 #include "conn_queue.h"
+#include "conn_heap.h"
 
 #define MAX_THREADS 100
 
@@ -10,9 +11,13 @@ typedef struct __ThreadPool
 {
     pthread_t *pids;
     int size;
+
+    char *sched_algo;
     ConnQueue *q;
+    ConnHeap *h;
 } ThreadPool;
 
-void thread_pool_init(ThreadPool *tp, int size, ConnQueue *q);
+void thread_pool_init(ThreadPool *tp, int size, char *sched_algo, ConnQueue *q, ConnHeap *h);
+void thread_pool_free(ThreadPool *tp);
 
 #endif

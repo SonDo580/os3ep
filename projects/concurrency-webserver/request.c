@@ -6,8 +6,6 @@
 // Hopefully this is not a problem ... :)
 //
 
-#define MAXBUF (8192)
-
 void request_error(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg)
 {
     char buf[MAXBUF], body[MAXBUF];
@@ -159,52 +157,63 @@ void request_serve_static(int fd, char *filename, int filesize)
     munmap_or_die(srcp, filesize);
 }
 
-// handle a request
-void request_handle(int fd)
+int request_handle_http_line(int fd, RequestInfo *req)
 {
-    int is_static;
-    struct stat sbuf;
-    char buf[MAXBUF], method[MAXBUF], uri[MAXBUF], version[MAXBUF];
-    char filename[MAXBUF], cgiargs[MAXBUF];
+    char buf[MAXBUF];
 
     readline_or_die(fd, buf, MAXBUF);
-    sscanf(buf, "%s %s %s", method, uri, version);
-    printf("method:%s uri:%s version:%s\n", method, uri, version);
+    sscanf(buf, "%s %s %s", req->method, req->uri, req->version);
+    printf("method:%s uri:%s version:%s\n", req->method, req->uri, req->version);
 
-    if (strcasecmp(method, "GET"))
+    if (strcasecmp(req->method, "GET"))
     {
-        request_error(fd, method, "501", "Not Implemented", "server does not implement this method");
-        return;
+        request_error(fd, req->method, "501", "Not Implemented", "server does not implement this method");
+        return -1;
     }
+
+    req->is_static = request_parse_uri(req->uri, req->filename, req->cgiargs);
+    if (strstr(req->filename, "../"))
+    {
+        request_error(fd, req->filename, "403", "Forbidden", "'..' path is not allowed");
+        return -1;
+    }
+    if (stat(req->filename, &req->sbuf) < 0)
+    {
+        request_error(fd, req->filename, "404", "Not found", "server could not find this file");
+        return -1;
+    }
+
+    return 0;
+}
+
+void request_handle_after_http_line(int fd, RequestInfo *req)
+{
     request_read_headers(fd);
 
-    is_static = request_parse_uri(uri, filename, cgiargs);
-    if (strstr(filename, "../")) {
-        request_error(fd, filename, "403", "Forbidden", "'..' path is not allowed");
-        return;
-    }
-    if (stat(filename, &sbuf) < 0)
+    if (req->is_static)
     {
-        request_error(fd, filename, "404", "Not found", "server could not find this file");
-        return;
-    }
-
-    if (is_static)
-    {
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode))
+        if (!(S_ISREG(req->sbuf.st_mode)) || !(S_IRUSR & req->sbuf.st_mode))
         {
-            request_error(fd, filename, "403", "Forbidden", "server could not read this file");
+            request_error(fd, req->filename, "403", "Forbidden", "server could not read this file");
             return;
         }
-        request_serve_static(fd, filename, sbuf.st_size);
+        request_serve_static(fd, req->filename, req->sbuf.st_size);
     }
     else
     {
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode))
+        if (!(S_ISREG(req->sbuf.st_mode)) || !(S_IXUSR & req->sbuf.st_mode))
         {
-            request_error(fd, filename, "403", "Forbidden", "server could not run this CGI program");
+            request_error(fd, req->filename, "403", "Forbidden", "server could not run this CGI program");
             return;
         }
-        request_serve_dynamic(fd, filename, cgiargs);
+        request_serve_dynamic(fd, req->filename, req->cgiargs);
     }
+}
+
+// handle a request
+void request_handle(int fd, RequestInfo *req)
+{
+    if (request_handle_http_line(fd, req) == -1)
+        return;
+    request_handle_after_http_line(fd, req);
 }

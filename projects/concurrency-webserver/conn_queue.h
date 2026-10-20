@@ -3,8 +3,6 @@
 
 #include "common_threads.h"
 
-#define MAXBUF 1024
-
 typedef struct __ConnQueue
 {
     int *buf;
@@ -20,6 +18,7 @@ typedef struct __ConnQueue
 } ConnQueue;
 
 void conn_queue_init(ConnQueue *q, int size);
+void conn_queue_free(ConnQueue *q);
 void conn_queue_produce(ConnQueue *q, int connfd);
 int conn_queue_consume(ConnQueue *q);
 
