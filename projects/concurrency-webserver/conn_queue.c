@@ -18,11 +18,6 @@ void conn_queue_init(ConnQueue *q, int size)
     Pthread_cond_init(&q->empty, NULL);
 }
 
-void conn_queue_free(ConnQueue *q)
-{
-    free(q->buf);
-}
-
 static void conn_queue_put(ConnQueue *q, int connfd)
 {
     q->buf[q->fill_ptr] = connfd;

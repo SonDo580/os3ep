@@ -30,11 +30,6 @@ void conn_heap_init(ConnHeap *h, int size)
     Pthread_cond_init(&h->empty, NULL);
 }
 
-void conn_heap_free(ConnHeap *h)
-{
-    free(h->items);
-}
-
 static inline int parent_index(int i)
 {
     return (i + 1) / 2 - 1;

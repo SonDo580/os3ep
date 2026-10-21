@@ -45,11 +45,3 @@ void thread_pool_init(ThreadPool *tp, int size, char *sched_algo, ConnQueue *q, 
     for (int i = 0; i < tp->size; i++)
         Pthread_create(&tp->pids[i], NULL, worker, (void *)tp);
 }
-
-void thread_pool_free(ThreadPool *tp)
-{
-    for (int i = 0; i < tp->size; i++)
-        Pthread_join(tp->pids[i], NULL);
-
-    free(tp->pids);
-}

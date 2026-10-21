@@ -25,7 +25,6 @@ typedef struct __ConnHeap
 } ConnHeap;
 
 void conn_heap_init(ConnHeap *h, int size);
-void conn_heap_free(ConnHeap *h);
 void conn_heap_produce(ConnHeap *h, ConnHeapItem item);
 ConnHeapItem conn_heap_consume(ConnHeap *h);
 

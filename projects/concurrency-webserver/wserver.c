@@ -97,17 +97,5 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (q != NULL)
-	{
-		conn_queue_free(q);
-		free(q);
-	}
-	if (h != NULL)
-	{
-		conn_heap_free(h);
-		free(h);
-	}
-	thread_pool_free(&tp);
-
 	return 0;
 }

@@ -18,6 +18,5 @@ typedef struct __ThreadPool
 } ThreadPool;
 
 void thread_pool_init(ThreadPool *tp, int size, char *sched_algo, ConnQueue *q, ConnHeap *h);
-void thread_pool_free(ThreadPool *tp);
 
 #endif
