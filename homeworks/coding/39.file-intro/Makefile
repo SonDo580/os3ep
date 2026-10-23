@@ -11,5 +11,8 @@ stat.exe: stat.c
 ls.exe: ls.c
 	$(CC) $(CFLAGS) -o $@ $<
 
+tail.exe: tail.c
+	$(CC) $(CFLAGS) -o $@ $<
+
 clean:
 	rm *.exe
