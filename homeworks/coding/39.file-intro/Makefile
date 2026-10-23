@@ -3,9 +3,12 @@ CFLAGS = -g -Wall -Wextra
 
 .PHONY: all clean
 
-all: stat.exe
+all: stat.exe ls.exe
  
 stat.exe: stat.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+ls.exe: ls.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 clean:
