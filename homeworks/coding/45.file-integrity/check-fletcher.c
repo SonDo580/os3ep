@@ -93,5 +93,6 @@ int main(int argc, char *argv[])
     print_bits((unsigned char)s1, "s1");
     print_bits((unsigned char)s2, "s2");
 
+    close(fd);
     return 0;
 }
