@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <fcntl.h>
 
 volatile sig_atomic_t server_running = 1;
 
@@ -34,6 +35,7 @@ typedef struct
     FILE *client_file[FD_SETSIZE]; // (single) open file per client
 } pool;
 
+void make_nonblocking(int fd);
 void init_pool(int listenfd, pool *p);
 void add_client(int connfd, struct sockaddr_in client_addr, pool *p);
 void service_clients(pool *p);
@@ -49,6 +51,9 @@ int main()
         perror("socket()");
         exit(1);
     }
+
+    // Make listening socket nonblocking
+    make_nonblocking(listenfd);
 
     // allow binding to the same `IP:port` after restart
     int val = 1;
@@ -115,9 +120,15 @@ int main()
             socklen_t addrlen = sizeof(client_addr);
             int connfd = accept(listenfd, (struct sockaddr *)&client_addr, &addrlen);
             if (connfd < 0)
-                perror("accept()");
+            {
+                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                    perror("accept()");
+            }
             else
+            {
+                make_nonblocking(connfd); // Make connected socket nonblocking
                 add_client(connfd, client_addr, &pool);
+            }
         }
 
         // service ready client connections
@@ -125,6 +136,23 @@ int main()
     }
 
     return 0;
+}
+
+/* Set a file descriptor to non-blocking mode */
+void make_nonblocking(int fd)
+{
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+    {
+        perror("fcntl()");
+        exit(1);
+    }
+
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        perror("fcntl()");
+        exit(1);
+    }
 }
 
 /* Initialize pool of active clients. */
@@ -243,8 +271,11 @@ void service_clients(pool *p)
 
             if (n < 0)
             {
-                perror("read()");
-                remove_client(i, p);
+                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                {
+                    perror("read()");
+                    remove_client(i, p);
+                }
             }
             else if (n == 0) // EOF
             {
