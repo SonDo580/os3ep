@@ -14,7 +14,8 @@ volatile sig_atomic_t server_running = 1;
 void sigint_handler(int sig)
 {
     server_running = 0;
-    printf("\nShutting down...\n");
+    const char msg[] = "\nShutting down...\n";
+    write(STDOUT_FILENO, msg, sizeof(msg) - 1); // why -1: don't write '\0'
 }
 
 // Pool of connected descriptors
@@ -60,16 +61,14 @@ int main()
     int port = 8000;
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(0); // 0.0.0.0 - listen on all network interfaces
-    int rv = bind(listenfd, (const struct sockaddr *)&addr, sizeof(addr));
-    if (rv < 0)
+    if (bind(listenfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
         perror("bind()");
         exit(1);
     }
 
     // listen for incoming connections
-    rv = listen(listenfd, SOMAXCONN);
-    if (rv < 0)
+    if (listen(listenfd, SOMAXCONN) < 0)
     {
         perror("listen()");
         exit(1);
