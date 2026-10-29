@@ -9,14 +9,29 @@
 #include <errno.h>
 #include <time.h>
 #include <fcntl.h>
+#include <assert.h>
 
 volatile sig_atomic_t server_running = 1;
+int sig_pipe[2];
 
-void sigint_handler(int sig)
+void shutdown_signal_handler(int sig)
 {
     server_running = 0;
-    const char msg[] = "\nShutting down...\n";
-    write(STDOUT_FILENO, msg, sizeof(msg) - 1); // why -1: don't write '\0'
+
+    // Write a single byte to the pipe to wake up event loop thread
+    char val = 1;
+    write(sig_pipe[1], &val, sizeof(char));
+}
+
+void setup_signals()
+{
+    struct sigaction sa = {};
+    sa.sa_handler = shutdown_signal_handler;
+    sigemptyset(&sa.sa_mask); // no signals are blocked while the handler is running
+    sa.sa_flags = 0;          // standard behavior
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 }
 
 // Pool of connected descriptors
@@ -43,7 +58,15 @@ int has_active_clients(pool *p);
 
 int main()
 {
-    signal(SIGINT, sigint_handler);
+    // Setup self-pipe and signals
+    if (pipe(sig_pipe) < 0)
+    {
+        perror("pipe()");
+        exit(1);
+    }
+    make_nonblocking(sig_pipe[0]);
+    make_nonblocking(sig_pipe[1]);
+    setup_signals();
 
     int listenfd = socket(AF_INET, SOCK_STREAM, 0); // IPv4 + TCP
     if (listenfd < 0)
@@ -52,7 +75,7 @@ int main()
         exit(1);
     }
 
-    // Make listening socket nonblocking
+    // make listening socket nonblocking
     make_nonblocking(listenfd);
 
     // allow binding to the same `IP:port` after restart
@@ -82,19 +105,16 @@ int main()
     pool pool;
     init_pool(listenfd, &pool);
 
+    // register read end of signal pipe for read monitoring
+    FD_SET(sig_pipe[0], &pool.read_set);
+    if (sig_pipe[0] > pool.maxfd)
+        pool.maxfd = sig_pipe[0];
+
     printf("Server listening on port %d\n", port);
 
     // event loop
     while (server_running || has_active_clients(&pool))
     {
-        // if shutting down, ensure listenfd is no longer watched
-        if (!server_running && listenfd != -1)
-        {
-            close(listenfd);
-            FD_CLR(listenfd, &pool.read_set);
-            listenfd = -1; // closed
-        }
-
         pool.ready_read_set = pool.read_set;
         pool.ready_write_set = pool.write_set;
         pool.nready = select(
@@ -108,9 +128,29 @@ int main()
         {
             if (errno == EINTR)
                 continue;
+            else
+            {
+                perror("select()");
+                break;
+            }
+        }
 
-            perror("select()");
-            break;
+        // check if signal pipe has data (SIGINT or SIGTERM was caught)
+        if (FD_ISSET(sig_pipe[0], &pool.ready_read_set))
+        {
+            // drain pipe (so select() doesn't trigger again on next iteration)
+            char buf[16];
+            while (read(sig_pipe[0], buf, sizeof(buf)) > 0)
+                ;
+
+            const char msg[] = "\nShutting down...\n";
+            write(STDOUT_FILENO, msg, sizeof(msg) - 1); // why -1: don't write '\0'
+
+            // ensure listenfd is no longer watched
+            assert(listenfd != -1);
+            close(listenfd);
+            FD_CLR(listenfd, &pool.read_set);
+            listenfd = -1; // closed
         }
 
         // if not shutting down and listenfd is ready, accept new client
@@ -134,6 +174,10 @@ int main()
         // service ready client connections
         service_clients(&pool);
     }
+
+    // Clean up
+    close(sig_pipe[0]);
+    close(sig_pipe[1]);
 
     return 0;
 }
