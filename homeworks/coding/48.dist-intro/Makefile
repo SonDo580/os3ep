@@ -6,11 +6,11 @@ CFLAGS = $(cflags)
 
 all: client.exe server.exe
 
-client.exe: client.c common.h
-	$(CC) $(CFLAGS) client.c -o client.exe
+client.exe: client.c comm_lib.h comm_lib.c
+	$(CC) $(CFLAGS) -o client.exe client.c comm_lib.c
 
-server.exe: server.c common.h
-	$(CC) $(CFLAGS) server.c -o server.exe
+server.exe: server.c comm_lib.h comm_lib.c
+	$(CC) $(CFLAGS) -o server.exe server.c comm_lib.c
 
 clean:
 	rm -f *.exe
